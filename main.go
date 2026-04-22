@@ -473,10 +473,17 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// maxBodySize limits JSON request bodies to 1 MB.
+const maxBodySize = 1 << 20
+
 func handleCreate(w http.ResponseWriter, r *http.Request) {
 	var feed Feed
-	if err := json.NewDecoder(r.Body).Decode(&feed); err != nil {
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxBodySize)).Decode(&feed); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if feed.Name == "" || feed.URL == "" {
+		http.Error(w, "name and url are required", http.StatusBadRequest)
 		return
 	}
 	feeds, idx, err := findFeed(feed.Name)
@@ -499,7 +506,7 @@ func handleCreate(w http.ResponseWriter, r *http.Request) {
 func handleUpdate(w http.ResponseWriter, r *http.Request) {
 	name := feedName(r)
 	var feed Feed
-	if err := json.NewDecoder(r.Body).Decode(&feed); err != nil {
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxBodySize)).Decode(&feed); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
