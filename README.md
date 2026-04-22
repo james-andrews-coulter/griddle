@@ -75,6 +75,8 @@ The app listens on port `4080`. Data is a single JSON file — no database requi
 
 When running the binary directly (not Docker), set `DATA_FILE` to a writable path — the default `/data/feeds.json` assumes a Docker volume mount.
 
+The `/health` endpoint returns `ok` — useful for Docker health checks and uptime monitoring.
+
 ## Architecture
 
 Single-file Go app (`main.go`, ~650 lines) with no external framework:
@@ -112,6 +114,17 @@ If it reads RSS, yes. The filtered feed URL (`/feeds/<name>`) serves standard RS
 
 **Q: Why "Griddle"?**
 A griddle is a miner's sieve — a nod to the data-miner-like level of control this tool gives you over your feeds.
+
+## Alternatives
+
+| Tool | What it does | Gap |
+|------|-------------|-----|
+| [rss-funnel](https://github.com/shouya/rss-funnel) | Modular RSS pipeline with YAML config | No visual UI, Rust parser drops custom XML tags |
+| [feedfilter](https://github.com/cdzombak/feedfilter) | Go CLI with CEL expressions | CLI-only, single expression per feed, no UI |
+| [rss-lambda](https://github.com/sekai-soft/rss-lambda) | Keyword include/exclude filtering | No saved rules, no logic groups, keyword-only |
+| [FreshRSS](https://github.com/FreshRSS/FreshRSS) / [Miniflux](https://github.com/miniflux/v2) | Full RSS readers with built-in filters | Filtering is internal — no filtered feed URL output |
+
+RSS Griddle fills the gap: a visual rule builder with nested logic, custom XML field support, and filtered feed URL output — in a single self-hosted binary.
 
 ## Why I Built This
 
