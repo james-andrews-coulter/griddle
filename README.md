@@ -1,6 +1,9 @@
 # RSS Griddle
 
-![RSS Griddle screenshot](docs/images/hero.png)
+<p>
+  <img src="docs/images/hero.png" alt="RSS Griddle desktop screenshot" width="70%">
+  <img src="docs/images/mobile.png" alt="RSS Griddle mobile screenshot" width="25%">
+</p>
 
 A tiny, self-hosted RSS filter proxy with a visual rule builder, multiple rules per feed, and nested logic groups.
 
@@ -70,8 +73,9 @@ Drop that URL into any RSS reader, automation tool, or script. The feed is filte
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `DATA_FILE` | `/data/feeds.json` | Path to the JSON persistence file |
+| `PORT` | `4080` | HTTP listen port |
 
-The app listens on port `4080`. Data is a single JSON file — no database required.
+Data is a single JSON file — no database required.
 
 When running the binary directly (not Docker), set `DATA_FILE` to a writable path — the default `/data/feeds.json` assumes a Docker volume mount.
 
