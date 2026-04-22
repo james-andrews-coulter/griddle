@@ -132,7 +132,7 @@ I built RSS Griddle as part of a personal newspaper project — a daily email th
 
 ---
 
-Made with &hearts; by [James Coulter](https://www.jamesandrewscoulter.com) · [GitHub](https://github.com/james-andrews-coulter/rss-griddle)
+Made with &hearts; by [James Coulter](https://www.jamesandrewscoulter.com) · [GitHub](https://github.com/james-andrews-coulter/rss-griddle) · [Buy me a coffee](https://buymeacoffee.com/jamesalexanderdesign)
 
 ## License
 

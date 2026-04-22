@@ -358,8 +358,9 @@ new MutationObserver(updateVisibility).observe(
 );
 updateVisibility();
 </script>
-<footer style="margin-top:calc(var(--global-space) * 4);opacity:0.6;font-size:0.85em">
-<p>Made with &hearts; by <a href="https://www.jamesandrewscoulter.com">James Coulter</a> · <a href="https://github.com/james-andrews-coulter/rss-griddle">GitHub</a></p>
+<footer style="margin-top:calc(var(--global-space) * 4);opacity:0.7;font-size:0.85em;display:flex;align-items:center;gap:1em;flex-wrap:wrap">
+<span>Made with &hearts; by <a href="https://www.jamesandrewscoulter.com">James Coulter</a> · <a href="https://github.com/james-andrews-coulter/rss-griddle">GitHub</a></span>
+<script type="text/javascript" src="https://cdnjs.buymeacoffee.com/1.0.0/button.prod.min.js" data-name="bmc-button" data-slug="jamesalexanderdesign" data-color="#1a95e0" data-emoji="" data-font="Cookie" data-text="Buy me a coffee" data-outline-color="#000000" data-font-color="#ffffff" data-coffee-color="#ffffff"></script>
 </footer>
 </main>
 </body>
