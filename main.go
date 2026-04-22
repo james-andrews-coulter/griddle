@@ -510,6 +510,10 @@ func handleUpdate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	if feed.URL == "" {
+		http.Error(w, "url is required", http.StatusBadRequest)
+		return
+	}
 	feeds, idx, err := findFeed(name)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)

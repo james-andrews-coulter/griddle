@@ -446,6 +446,30 @@ func TestHandlers(t *testing.T) {
 		}
 	})
 
+	t.Run("create with missing name returns 400", func(t *testing.T) {
+		feed := Feed{URL: rssServer.URL}
+		body, _ := json.Marshal(feed)
+		req := httptest.NewRequest("POST", "/feeds", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		handleCreate(w, req)
+		if w.Code != http.StatusBadRequest {
+			t.Errorf("expected 400, got %d: %s", w.Code, w.Body.String())
+		}
+	})
+
+	t.Run("create with missing url returns 400", func(t *testing.T) {
+		feed := Feed{Name: "no-url"}
+		body, _ := json.Marshal(feed)
+		req := httptest.NewRequest("POST", "/feeds", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		handleCreate(w, req)
+		if w.Code != http.StatusBadRequest {
+			t.Errorf("expected 400, got %d: %s", w.Code, w.Body.String())
+		}
+	})
+
 	t.Run("serve filtered feed", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/feeds/test.xml", nil)
 		req.SetPathValue("name", "test.xml")
