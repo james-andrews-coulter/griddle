@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/mmcdole/gofeed"
+	ext "github.com/mmcdole/gofeed/extensions"
 )
 
 func TestLoadSaveFeeds(t *testing.T) {
@@ -364,6 +365,113 @@ func TestFilterItems(t *testing.T) {
 	})
 }
 
+func TestFilterItemsWithExtensions(t *testing.T) {
+	// Build items with namespaced extensions, as gofeed populates them for
+	// tags like <job_listing:company>, <dc:creator>, <media:thumbnail url="...">.
+	makeItem := func(title string, exts ext.Extensions) *gofeed.Item {
+		return &gofeed.Item{Title: title, Extensions: exts}
+	}
+
+	items := []*gofeed.Item{
+		makeItem("Senior Designer", ext.Extensions{
+			"job_listing": {
+				"company":  []ext.Extension{{Name: "company", Value: "Bloomreach"}},
+				"location": []ext.Extension{{Name: "location", Value: "Europe"}},
+			},
+			"dc": {"creator": []ext.Extension{{Name: "creator", Value: "Jane Doe"}}},
+		}),
+		makeItem("Product Designer", ext.Extensions{
+			"job_listing": {
+				"company":  []ext.Extension{{Name: "company", Value: "360Learning"}},
+				"location": []ext.Extension{{Name: "location", Value: "Europe"}},
+			},
+		}),
+		makeItem("Bloomreach on-site role", ext.Extensions{
+			"job_listing": {
+				"company":  []ext.Extension{{Name: "company", Value: "Acme"}},
+				"location": []ext.Extension{{Name: "location", Value: "USA"}},
+			},
+		}),
+	}
+
+	t.Run("filter by namespaced company tag", func(t *testing.T) {
+		feed := Feed{
+			Name:       "jobs",
+			GroupLogic: "all",
+			Groups: []FilterGroup{{
+				Logic: "all",
+				Rules: []Rule{{Field: "job_listing_company", Operator: "equals", Value: "bloomreach"}},
+			}},
+		}
+		got := filterItems(items, feed)
+		if len(got) != 1 || got[0].Title != "Senior Designer" {
+			t.Errorf("expected [Senior Designer], got %v", titlesOf(got))
+		}
+	})
+
+	t.Run("filter by dc:creator exposed as dc_creator", func(t *testing.T) {
+		feed := Feed{
+			Name:       "jobs",
+			GroupLogic: "all",
+			Groups: []FilterGroup{{
+				Logic: "all",
+				Rules: []Rule{{Field: "dc_creator", Operator: "contains", Value: "jane"}},
+			}},
+		}
+		got := filterItems(items, feed)
+		if len(got) != 1 || got[0].Title != "Senior Designer" {
+			t.Errorf("expected [Senior Designer], got %v", titlesOf(got))
+		}
+	})
+
+	t.Run("attribute fallback: media:thumbnail url", func(t *testing.T) {
+		// <media:thumbnail url="https://cdn/img.png"/> — Value is empty, url lives in Attrs.
+		itemsWithAttr := []*gofeed.Item{
+			{Title: "Has Image", Extensions: ext.Extensions{
+				"media": {"thumbnail": []ext.Extension{{
+					Name:  "thumbnail",
+					Attrs: map[string]string{"url": "https://cdn.example.com/a.png"},
+				}}},
+			}},
+			{Title: "No Image"},
+		}
+		feed := Feed{
+			Name:       "feed",
+			GroupLogic: "all",
+			Groups: []FilterGroup{{
+				Logic: "all",
+				Rules: []Rule{{Field: "media_thumbnail", Operator: "contains", Value: "cdn.example.com"}},
+			}},
+		}
+		got := filterItems(itemsWithAttr, feed)
+		if len(got) != 1 || got[0].Title != "Has Image" {
+			t.Errorf("expected [Has Image], got %v", titlesOf(got))
+		}
+	})
+
+	t.Run("multiple values joined for repeated tags", func(t *testing.T) {
+		// e.g. two <dc:subject> tags
+		it := &gofeed.Item{Title: "Tagged", Extensions: ext.Extensions{
+			"dc": {"subject": []ext.Extension{
+				{Name: "subject", Value: "golang"},
+				{Name: "subject", Value: "rss"},
+			}},
+		}}
+		feed := Feed{
+			Name:       "feed",
+			GroupLogic: "all",
+			Groups: []FilterGroup{{
+				Logic: "all",
+				Rules: []Rule{{Field: "dc_subject", Operator: "contains", Value: "rss"}},
+			}},
+		}
+		got := filterItems([]*gofeed.Item{it}, feed)
+		if len(got) != 1 {
+			t.Errorf("expected 1 item, got %d", len(got))
+		}
+	})
+}
+
 func titlesOf(items []*gofeed.Item) []string {
 	titles := make([]string, len(items))
 	for i, item := range items {
@@ -485,12 +593,12 @@ func TestHandlers(t *testing.T) {
 		if strings.Contains(body, "Engineer Onsite US") {
 			t.Error("non-matching item 'Engineer Onsite US' should be absent")
 		}
-		// Custom tags should not appear in output
-		if strings.Contains(body, "<workmode>") {
-			t.Error("custom tag <workmode> should not appear in output")
+		// Custom tags from the upstream item must be preserved in the output.
+		if !strings.Contains(body, "<workmode>Remote</workmode>") {
+			t.Error("custom tag <workmode> should be preserved on kept item")
 		}
-		if strings.Contains(body, "<location>") {
-			t.Error("custom tag <location> should not appear in output")
+		if !strings.Contains(body, "<location>Europe</location>") {
+			t.Error("custom tag <location> should be preserved on kept item")
 		}
 	})
 

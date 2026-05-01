@@ -15,8 +15,9 @@ A tiny, self-hosted RSS filter proxy with a visual rule builder, multiple rules 
 
 - **Visual rule builder** — point-and-click filter creation, no YAML or config files
 - **Unlimited rules with nested logic** — other tools give you one filter per feed. Griddle gives you as many as you need, organized into logic groups (AND/OR/NOR) with group-level logic on top — two levels of nesting.
-- **Custom XML field support** — filter on any tag in the feed, not just title and description. If the feed has `<location>`, `<workmode>`, `<salary>`, or any other custom XML tag, you can build rules on it. Most RSS tools silently drop these fields — Griddle preserves and exposes them.
-- **Tiny and focused** — ~650 lines of Go, no database, no framework — just a binary that filters feeds. Starts in milliseconds, runs on anything.
+- **Custom XML field support** — filter on any tag in the feed, not just title and description. If the feed has `<location>`, `<workmode>`, `<salary>`, or any other custom XML tag, you can build rules on it. Most RSS tools silently drop these fields — Griddle preserves and exposes them, both for filtering input and in the filtered output.
+- **Live filter preview** — see exactly which items pass and which get filtered as you build rules. The preview pane auto-updates 500ms after every edit, showing each upstream `<item>` rendered as XML and color-coded by status. No round-trip through a reader to debug.
+- **Tiny and focused** — ~1000 lines of Go, no database, no framework — just a binary that filters feeds. Starts in milliseconds, runs on anything.
 - **Pre-filter at the source** — filter once at the root, get clean signal everywhere downstream.
 - **Mobile-friendly** — manage filters from your phone
 
@@ -27,8 +28,8 @@ A tiny, self-hosted RSS filter proxy with a visual rule builder, multiple rules 
 ### Binary
 
 ```bash
-git clone https://github.com/james-andrews-coulter/rss-griddle.git
-cd rss-griddle
+git clone https://github.com/james-andrews-coulter/griddle.git
+cd griddle
 go build -o rss-griddle .
 DATA_FILE=./feeds.json ./rss-griddle
 ```
@@ -83,19 +84,24 @@ The `/health` endpoint returns `ok` — useful for Docker health checks and upti
 
 ## Architecture
 
-Single-file Go app (`main.go`, ~650 lines) with no external framework:
+Single-file Go app (`main.go`, ~1000 lines) with no external framework:
 
 ```
 Browser ──> Go HTTP server (:4080)
-              ├── GET /              → UI: feed list + rule builder form
-              ├── POST /feeds        → Create feed config
-              ├── GET /feeds/{name}  → Filtered RSS XML output
+              ├── GET /                → UI: feed list + rule builder + live preview pane
+              ├── POST /feeds          → Create feed config
+              ├── POST /api/dryrun     → Debounced live preview, items labeled pass/filter
+              ├── GET /feeds/{name}    → Filtered RSS XML output (preserves custom fields)
               └── JSON file (/data/feeds.json)
 ```
 
-**Filter engine:** Rules are compiled into [expr-lang](https://github.com/expr-lang/expr) expressions at request time. Each feed item is evaluated against the compiled expression — items that match pass through, the rest are dropped. The output is standard RSS 2.0 XML via [gorilla/feeds](https://github.com/gorilla/feeds).
+**Filter engine:** Rules are compiled into [expr-lang](https://github.com/expr-lang/expr) expressions at request time. Each feed item is evaluated against the compiled expression — items that match pass through, the rest are dropped.
 
-**Feed parsing:** [gofeed](https://github.com/mmcdole/gofeed) parses upstream RSS/Atom feeds and — critically — preserves non-namespaced custom XML tags in `Item.Custom`. This is the technical foundation that makes custom field filtering possible; most RSS parsers silently discard these tags.
+**Output preservation:** filtered feeds are produced by parsing the upstream XML with [etree](https://github.com/beevik/etree), removing only the items that don't match, and re-serializing. Custom XML fields, namespaces, and attributes survive into the output byte-for-byte. Standard RSS-reconstruction libraries (gorilla/feeds and friends) emit a fixed set of fields and silently drop the rest.
+
+**Feed parsing:** [gofeed](https://github.com/mmcdole/gofeed) parses upstream RSS/Atom feeds and exposes non-namespaced custom XML tags in `Item.Custom`. Namespaced tags (`dc:creator`, `media:thumbnail`) are flattened to `<prefix>_<tag>` keys for filter evaluation.
+
+**Live preview:** the rule editor sends current form state to `/api/dryrun` on a 500 ms debounce. The endpoint returns each upstream `<item>` serialized as XML with a `passed` flag, backed by a 5-minute in-process URL-keyed cache so debounced edits don't hammer the source.
 
 **Frontend:** Server-rendered Go templates with [HTMX](https://htmx.org) for dynamic form interactions and [terminal.css](https://terminalcss.xyz) for styling. No build step, no npm.
 
@@ -139,7 +145,7 @@ I built Griddle as part of a personal newspaper project — a daily email that p
 **Dependencies:**
 - [gofeed](https://github.com/mmcdole/gofeed) — RSS/Atom parser that preserves custom XML tags
 - [expr-lang](https://github.com/expr-lang/expr) — expression language for filter evaluation
-- [gorilla/feeds](https://github.com/gorilla/feeds) — RSS 2.0 XML output
+- [etree](https://github.com/beevik/etree) — XML tree parser/serializer for output preservation and live preview
 - [HTMX](https://htmx.org) — dynamic form interactions without JavaScript frameworks
 - [terminal.css](https://terminalcss.xyz) — minimal terminal-style CSS
 
@@ -149,7 +155,7 @@ I built Griddle as part of a personal newspaper project — a daily email that p
 
 ---
 
-Made with &hearts; by [James Coulter](https://www.jamesandrewscoulter.com) · [GitHub](https://github.com/james-andrews-coulter/rss-griddle) · [Buy me a coffee](https://buymeacoffee.com/jamesalexanderdesign)
+Made with &hearts; by [James Coulter](https://www.jamesandrewscoulter.com) · [GitHub](https://github.com/james-andrews-coulter/griddle) · [Buy me a coffee](https://buymeacoffee.com/jamesalexanderdesign)
 
 ## License
 

@@ -4,14 +4,16 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"io"
 	"log"
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
+	"github.com/beevik/etree"
 	"github.com/expr-lang/expr"
-	rfeed "github.com/gorilla/feeds"
 	"github.com/mmcdole/gofeed"
 )
 
@@ -38,7 +40,6 @@ type Rule struct {
 // --- Persistence ---
 
 var dataFile = "/data/feeds.json"
-var port = "4080"
 
 func loadFeeds() ([]Feed, error) {
 	data, err := os.ReadFile(dataFile)
@@ -183,6 +184,31 @@ func itemToEnv(item *gofeed.Item, fields []string) map[string]string {
 		}
 	}
 
+	// Namespaced XML tags (e.g. dc:creator, job_listing:company, media:thumbnail)
+	// are flattened to <prefix>_<tag> keys since expr-lang treats ":" as a type op.
+	// Repeated tags join by comma; tags whose Value is empty fall back to common
+	// URL-bearing attributes (url, href) so media:thumbnail etc. remain filterable.
+	for ns, tags := range item.Extensions {
+		for tag, exts := range tags {
+			key := ns + "_" + tag
+			if _, ok := env[key]; !ok {
+				continue
+			}
+			var values []string
+			for _, e := range exts {
+				switch {
+				case e.Value != "":
+					values = append(values, e.Value)
+				case e.Attrs["url"] != "":
+					values = append(values, e.Attrs["url"])
+				case e.Attrs["href"] != "":
+					values = append(values, e.Attrs["href"])
+				}
+			}
+			env[key] = strings.Join(values, ",")
+		}
+	}
+
 	return env
 }
 
@@ -226,31 +252,25 @@ func filterItems(items []*gofeed.Item, feed Feed) []*gofeed.Item {
 
 // --- Templates ---
 
-const rulePartial = `<fieldset class="rule">
-<legend>Rule</legend>
-<div class="form-group">
-<label>Field</label>
-<input type="text" name="field" placeholder="e.g. title, location">
-</div>
-<div class="form-group">
-<select name="operator">
+const rulePartial = `<div class="rule">
+<label class="sr-only">field</label>
+<input type="text" name="field" placeholder="title">
+<label class="sr-only">operator</label>
+<select name="operator" aria-label="operator">
 <option value="contains">contains</option>
 <option value="not_contains">not contains</option>
 <option value="equals">equals</option>
 <option value="not_equals">not equals</option>
 </select>
-</div>
-<div class="form-group">
-<label>Value</label>
-<input type="text" name="value" placeholder="e.g. Remote, Designer">
-</div>
-<div class="remove-rule" style="text-align:right"><a href="#" onclick="this.closest('.rule').remove();return false">remove rule</a></div>
-</fieldset>`
+<label class="sr-only">value</label>
+<input type="text" name="value" placeholder="value">
+<button type="button" class="link-action remove-rule" onclick="this.closest('.rule').remove()" aria-label="remove rule">remove</button>
+</div>`
 
 var groupPartial = `<fieldset class="group">
-<legend>Group</legend>
+<legend class="sr-only">group</legend>
 <div class="form-group group-logic" style="display:none">
-<label>Rules must match</label>
+<label>rules must match</label>
 <select name="group_logic">
 <option value="all">all (AND)</option>
 <option value="any" selected>any (OR)</option>
@@ -258,7 +278,10 @@ var groupPartial = `<fieldset class="group">
 </select>
 </div>
 <div class="rules">` + rulePartial + `</div>
-<a href="#" hx-get="/partials/rule" hx-target="previous .rules" hx-swap="beforeend">+ rule</a><span class="remove-group" style="float:right"><a href="#" onclick="this.closest('.group').remove();return false">remove group</a></span>
+<div class="rule-actions">
+<a href="#" hx-get="/partials/rule" hx-target="previous .rules" hx-swap="beforeend">+ rule</a>
+<button type="button" class="link-action remove-group" onclick="this.closest('.group').remove()">remove group</button>
+</div>
 </fieldset>`
 
 var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
@@ -276,17 +299,56 @@ var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>RSS Griddle</title>
 <link rel="stylesheet" href="https://unpkg.com/terminal.css@0.7.5/dist/terminal.min.css">
+<style>
+body.terminal{--primary-color:#1077c4}
+.link-action{background:none;border:0;padding:0;margin:0;font:inherit;color:var(--primary-color);cursor:pointer;text-decoration:none;line-height:inherit}
+.link-action:hover,.link-action:focus-visible{background:var(--primary-color);color:var(--invert-font-color);outline:none}
+#form-error{color:var(--error-color);padding:var(--global-space) 0;font-weight:600}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+fieldset.group{margin:0 0 var(--global-space) 0;padding:var(--global-space) calc(var(--global-space) * 1.5)}
+fieldset.group>legend{padding:0 calc(var(--global-space) / 2)}
+.group .form-group.group-logic{margin:0 0 var(--global-space) 0}
+.rule{display:grid;grid-template-columns:minmax(7em,1fr) minmax(7em,9em) minmax(7em,1fr) auto;gap:calc(var(--global-space) / 2);align-items:center;margin:0 0 calc(var(--global-space) / 2) 0}
+.rule input,.rule select{margin:0}
+.rule .remove-rule{justify-self:end;white-space:nowrap}
+@media (max-width:34em){.rule{grid-template-columns:1fr 1fr;row-gap:calc(var(--global-space) / 2)}.rule input[name="value"]{grid-column:1 / -1}.rule .remove-rule{grid-column:1 / -1}}
+.rule-actions{display:flex;justify-content:space-between;align-items:baseline;gap:var(--global-space);margin-top:calc(var(--global-space) / 2)}
+.workspace{display:flex;flex-direction:column;gap:calc(var(--global-space) * 2);margin-bottom:calc(var(--global-space) * 2)}
+.workspace>.form-column,.workspace>#preview-pane{min-width:0}
+.form-column{display:flex;flex-direction:column;gap:calc(var(--global-space) * 4)}
+.preview{border-top:1px solid var(--secondary-color);padding-top:var(--global-space)}
+.preview-status{margin:0 0 var(--global-space) 0;font-weight:600}
+.preview-status.preview-error{color:var(--error-color)}
+.preview-xml{margin:0;font-family:var(--mono-font-stack);font-size:13px;line-height:1.5em;white-space:pre-wrap;word-break:break-word;overflow-wrap:anywhere;padding-bottom:var(--global-space)}
+.preview-item{display:block;padding:2px 0}
+.preview-item.pass{color:var(--font-color)}
+.preview-item.filter{color:var(--secondary-color)}
+.preview-more{display:block;padding:var(--global-space) 0;color:var(--secondary-color);font-style:italic}
+.preview-loading .preview-xml,.preview-loading .preview-status:not(.preview-error){opacity:.6}
+@media (prefers-reduced-motion:no-preference){.preview-xml{transition:opacity 150ms cubic-bezier(0.22,1,0.36,1)}}
+@media (min-width:64em){
+  html,body{height:100vh;overflow:hidden}
+  body.terminal .container{max-width:90em;display:flex;flex-direction:column;height:100vh;box-sizing:border-box}
+  body.terminal .container>h1{flex:0 0 auto}
+  .workspace{flex:1;min-height:0;flex-direction:row;align-items:stretch;gap:calc(var(--global-space) * 3);margin-bottom:0}
+  .workspace>.form-column{flex:0 0 32em;overflow-y:auto;min-height:0;padding-right:var(--global-space)}
+  .workspace>#preview-pane{flex:1;overflow-y:auto;min-height:0;padding-bottom:var(--global-space)}
+  .preview{border-top:none;padding-top:0}
+  .preview-status{position:sticky;top:0;background:var(--background-color);padding:var(--global-space) 0 calc(var(--global-space) / 2);margin:0;z-index:1}
+}
+</style>
 <script src="https://unpkg.com/htmx.org@2.0.4"></script>
 </head>
 <body class="terminal">
 <main class="container">
 <h1>RSS Griddle</h1>
 
+<div class="workspace">
+<div class="form-column">
 <section id="feed-form">
 {{template "form" .}}
 </section>
-
-<section style="margin-top:calc(var(--global-space) * 4)">
+<section class="feeds">
 <h2>Feeds</h2>
 {{if .Feeds}}
 <table>
@@ -303,6 +365,15 @@ var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
 <p>No feeds yet.</p>
 {{end}}
 </section>
+</div>
+<aside id="preview-pane">
+<div id="preview" class="preview" hidden>
+<p id="preview-status" class="preview-status" aria-live="polite"></p>
+<pre id="preview-body" class="preview-xml"></pre>
+</div>
+</aside>
+</div>
+</main>
 
 <script>
 document.addEventListener("submit", function(e) {
@@ -334,8 +405,15 @@ document.addEventListener("submit", function(e) {
     headers: {"Content-Type": "application/json"},
     body: JSON.stringify(data)
   }).then(function(resp) {
-    if (resp.ok) location.reload();
-    else resp.text().then(function(t) { alert("Error: " + t); });
+    var err = document.getElementById('form-error');
+    if (resp.ok) {
+      if (err) { err.hidden = true; err.textContent = ''; }
+      location.reload();
+    } else {
+      resp.text().then(function(t) {
+        if (err) { err.textContent = 'Error: ' + (t || resp.status); err.hidden = false; }
+      });
+    }
   });
 });
 function updateVisibility() {
@@ -353,17 +431,162 @@ function updateVisibility() {
     if (rg) rg.style.display = groups.length >= 2 ? '' : 'none';
   });
 }
-new MutationObserver(updateVisibility).observe(
-  document.getElementById('groups') || document.body,
-  {childList: true, subtree: true}
-);
+new MutationObserver(updateVisibility).observe(document.body, {childList: true, subtree: true});
+document.body.addEventListener('htmx:afterSettle', updateVisibility);
 updateVisibility();
+
+// --- Live preview (dryrun) ---
+(function () {
+  var DEBOUNCE_MS = 500;
+  var debounceTimer = null;
+  var inFlight = null;
+
+  function getFormData() {
+    var form = document.getElementById('form');
+    if (!form) return null;
+    var urlEl = form.querySelector('[name="url"]');
+    var url = urlEl ? urlEl.value.trim() : '';
+    if (!url) return null;
+    var nameEl = form.querySelector('[name="name"]');
+    var groupLogicEl = form.querySelector('#group_logic');
+    var data = {
+      name: nameEl ? nameEl.value : '',
+      url: url,
+      group_logic: groupLogicEl ? groupLogicEl.value : 'any',
+      groups: []
+    };
+    form.querySelectorAll('.group').forEach(function (g) {
+      var glEl = g.querySelector('[name="group_logic"]');
+      var group = { logic: glEl ? glEl.value : 'any', rules: [] };
+      g.querySelectorAll('.rule').forEach(function (r) {
+        group.rules.push({
+          field: r.querySelector('[name="field"]').value,
+          operator: r.querySelector('[name="operator"]').value,
+          value: r.querySelector('[name="value"]').value
+        });
+      });
+      data.groups.push(group);
+    });
+    return data;
+  }
+
+  function setStatus(text, isError) {
+    var el = document.getElementById('preview-status');
+    if (!el) return;
+    el.textContent = text;
+    el.classList.toggle('preview-error', !!isError);
+  }
+
+  function renderItems(items, more) {
+    var body = document.getElementById('preview-body');
+    if (!body) return;
+    while (body.firstChild) body.removeChild(body.firstChild);
+    items.forEach(function (it, idx) {
+      var code = document.createElement('code');
+      code.className = 'preview-item ' + (it.passed ? 'pass' : 'filter');
+      code.textContent = it.xml + (idx < items.length - 1 ? '\n\n' : '');
+      body.appendChild(code);
+    });
+    if (more && more > 0) {
+      var moreEl = document.createElement('span');
+      moreEl.className = 'preview-more';
+      moreEl.textContent = '+ ' + more + ' more';
+      body.appendChild(moreEl);
+    }
+  }
+
+  function showPreview() {
+    var p = document.getElementById('preview');
+    if (p) p.hidden = false;
+  }
+  function hidePreview() {
+    var p = document.getElementById('preview');
+    if (p) p.hidden = true;
+  }
+
+  function runPreview() {
+    var preview = document.getElementById('preview');
+    if (!preview) return;
+    var data = getFormData();
+    if (!data) {
+      hidePreview();
+      return;
+    }
+    showPreview();
+    preview.classList.add('preview-loading');
+    setStatus('checking…', false);
+
+    if (inFlight) {
+      try { inFlight.abort(); } catch (e) {}
+    }
+    var ctrl = new AbortController();
+    inFlight = ctrl;
+
+    fetch('/api/dryrun', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+      signal: ctrl.signal
+    })
+      .then(function (resp) {
+        if (!resp.ok) {
+          return resp.text().then(function (t) {
+            var err = new Error(t || ('http ' + resp.status));
+            err.httpStatus = resp.status;
+            throw err;
+          });
+        }
+        return resp.json();
+      })
+      .then(function (j) {
+        preview.classList.remove('preview-loading');
+        var total = j.total || 0;
+        var passN = j.passN || 0;
+        var filterN = j.filterN || 0;
+        var status;
+        if (total === 0) {
+          status = 'feed has no items';
+        } else if (filterN === 0) {
+          status = total + ' items would all pass, add a rule to filter';
+        } else if (passN === 0) {
+          status = '0 of ' + total + ' items would pass, every item is filtered';
+        } else {
+          status = passN + ' of ' + total + ' items would pass';
+        }
+        setStatus(status, false);
+        renderItems(j.items || [], j.more || 0);
+      })
+      .catch(function (err) {
+        if (err && err.name === 'AbortError') return;
+        preview.classList.remove('preview-loading');
+        var raw = (err && err.message) ? err.message.split('\n')[0] : 'unknown error';
+        if (raw.length > 140) raw = raw.slice(0, 140) + '…';
+        setStatus(raw, true);
+      });
+  }
+
+  function scheduleRun() {
+    if (debounceTimer) clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(runPreview, DEBOUNCE_MS);
+  }
+
+  document.addEventListener('input', function (e) {
+    if (!e.target.closest || !e.target.closest('#form')) return;
+    scheduleRun();
+  });
+  document.addEventListener('change', function (e) {
+    if (!e.target.closest || !e.target.closest('#form')) return;
+    scheduleRun();
+  });
+  document.body.addEventListener('htmx:afterSettle', scheduleRun);
+  // Initial preview if URL is already populated (edit mode).
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function () { setTimeout(runPreview, 200); });
+  } else {
+    setTimeout(runPreview, 200);
+  }
+})();
 </script>
-<footer style="margin-top:calc(var(--global-space) * 4);opacity:0.7;font-size:0.85em;display:flex;align-items:center;gap:1em;flex-wrap:wrap">
-<span>Made with &hearts; by <a href="https://www.jamesandrewscoulter.com">James Coulter</a> · <a href="https://github.com/james-andrews-coulter/rss-griddle">GitHub</a></span>
-<script type="text/javascript" src="https://cdnjs.buymeacoffee.com/1.0.0/button.prod.min.js" data-name="bmc-button" data-slug="jamesalexanderdesign" data-color="#1a95e0" data-emoji="" data-font="Cookie" data-text="Buy me a coffee" data-outline-color="#000000" data-font-color="#ffffff" data-coffee-color="#ffffff"></script>
-</footer>
-</main>
 </body>
 </html>
 
@@ -392,9 +615,9 @@ updateVisibility();
 </div>
 <div id="groups">
 {{if .Edit}}{{range $gi, $g := .Edit.Groups}}<fieldset class="group">
-<legend>Group</legend>
+<legend class="sr-only">group</legend>
 <div class="form-group group-logic"{{if lt (len $g.Rules) 2}} style="display:none"{{end}}>
-<label>Rules must match</label>
+<label>rules must match</label>
 <select name="group_logic">
 <option value="all"{{if eq $g.Logic "all"}} selected{{end}}>all (AND)</option>
 <option value="any"{{if eq $g.Logic "any"}} selected{{end}}>any (OR)</option>
@@ -402,38 +625,36 @@ updateVisibility();
 </select>
 </div>
 <div class="rules">
-{{range $g.Rules}}<fieldset class="rule">
-<legend>Rule</legend>
-<div class="form-group">
-<label>Field</label>
-<input type="text" name="field" value="{{.Field}}" placeholder="e.g. title, location">
-</div>
-<div class="form-group">
-<select name="operator">
+{{range $g.Rules}}<div class="rule">
+<label class="sr-only">field</label>
+<input type="text" name="field" value="{{.Field}}" placeholder="title">
+<label class="sr-only">operator</label>
+<select name="operator" aria-label="operator">
 <option value="contains"{{if eq .Operator "contains"}} selected{{end}}>contains</option>
 <option value="not_contains"{{if eq .Operator "not_contains"}} selected{{end}}>not contains</option>
 <option value="equals"{{if eq .Operator "equals"}} selected{{end}}>equals</option>
 <option value="not_equals"{{if eq .Operator "not_equals"}} selected{{end}}>not equals</option>
 </select>
+<label class="sr-only">value</label>
+<input type="text" name="value" value="{{.Value}}" placeholder="value">
+<button type="button" class="link-action remove-rule" onclick="this.closest('.rule').remove()" aria-label="remove rule">remove</button>
+</div>{{end}}
 </div>
-<div class="form-group">
-<label>Value</label>
-<input type="text" name="value" value="{{.Value}}" placeholder="e.g. Remote, Designer">
+<div class="rule-actions">
+<a href="#" hx-get="/partials/rule" hx-target="previous .rules" hx-swap="beforeend">+ rule</a>
+<button type="button" class="link-action remove-group" onclick="this.closest('.group').remove()">remove group</button>
 </div>
-<div class="remove-rule" style="text-align:right"><a href="#" onclick="this.closest('.rule').remove();return false">remove rule</a></div>
-</fieldset>{{end}}
-</div>
-<a href="#" hx-get="/partials/rule" hx-target="previous .rules" hx-swap="beforeend">+ rule</a><span class="remove-group" style="float:right"><a href="#" onclick="this.closest('.group').remove();return false">remove group</a></span>
 </fieldset>{{end}}{{else}}` + groupPartial + `{{end}}
 </div>
 <div class="form-group">
 <a href="#" hx-get="/partials/group" hx-target="#groups" hx-swap="beforeend">+ group</a>
 </div>
 {{if .Edit}}<hr>{{end}}
+<div id="form-error" role="alert" aria-live="polite" hidden></div>
 <div class="form-group">
 <button type="submit" class="btn btn-default{{if not .Edit}} btn-block{{end}}">{{if .Edit}}Save{{else}}Create Feed{{end}}</button>
 </div>
-{{if .Edit}}<a href="#" onclick="location.reload();return false">cancel</a>{{end}}
+{{if .Edit}}<button type="button" class="link-action" onclick="location.reload()">cancel</button>{{end}}
 </fieldset>
 </form>
 {{end}}`))
@@ -568,11 +789,10 @@ func handleEdit(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-var feedParser = func() *gofeed.Parser {
-	p := gofeed.NewParser()
-	p.Client = &http.Client{Timeout: 15 * time.Second}
-	return p
-}()
+var (
+	feedParser = gofeed.NewParser()
+	feedClient = &http.Client{Timeout: 15 * time.Second}
+)
 
 func handleFeedXML(w http.ResponseWriter, r *http.Request) {
 	name := strings.TrimSuffix(feedName(r), ".xml")
@@ -585,38 +805,194 @@ func handleFeedXML(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "feed not found", http.StatusNotFound)
 		return
 	}
-	parsed, err := feedParser.ParseURL(feeds[idx].URL)
+
+	resp, err := feedClient.Get(feeds[idx].URL)
 	if err != nil {
 		http.Error(w, "failed to fetch upstream feed: "+err.Error(), http.StatusBadGateway)
 		return
 	}
-	filtered := filterItems(parsed.Items, feeds[idx])
-
-	out := &rfeed.Feed{
-		Title:       parsed.Title,
-		Link:        &rfeed.Link{Href: parsed.Link},
-		Description: parsed.Description,
-	}
-	for _, item := range filtered {
-		fi := &rfeed.Item{
-			Title:       item.Title,
-			Link:        &rfeed.Link{Href: item.Link},
-			Description: item.Description,
-			Id:          item.GUID,
-		}
-		if item.PublishedParsed != nil {
-			fi.Created = *item.PublishedParsed
-		}
-		out.Items = append(out.Items, fi)
+	defer resp.Body.Close()
+	rawXML, err := io.ReadAll(resp.Body)
+	if err != nil {
+		http.Error(w, "failed to read upstream feed: "+err.Error(), http.StatusBadGateway)
+		return
 	}
 
-	rss, err := out.ToRss()
+	parsed, err := feedParser.ParseString(string(rawXML))
+	if err != nil {
+		http.Error(w, "failed to parse upstream feed: "+err.Error(), http.StatusBadGateway)
+		return
+	}
+
+	keep := make(map[*gofeed.Item]bool, len(parsed.Items))
+	for _, item := range filterItems(parsed.Items, feeds[idx]) {
+		keep[item] = true
+	}
+
+	doc := etree.NewDocument()
+	if err := doc.ReadFromBytes(rawXML); err != nil {
+		http.Error(w, "failed to parse upstream XML: "+err.Error(), http.StatusBadGateway)
+		return
+	}
+
+	// Items are <item> in RSS/RDF, <entry> in Atom.
+	itemTag := "item"
+	if parsed.FeedType == "atom" {
+		itemTag = "entry"
+	}
+	xmlItems := doc.FindElements("//" + itemTag)
+	for i, el := range xmlItems {
+		if i >= len(parsed.Items) || !keep[parsed.Items[i]] {
+			el.Parent().RemoveChild(el)
+		}
+	}
+
+	out, err := doc.WriteToBytes()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	w.Header().Set("Content-Type", "application/rss+xml; charset=utf-8")
-	w.Write([]byte(rss))
+	if ct := resp.Header.Get("Content-Type"); ct != "" {
+		w.Header().Set("Content-Type", ct)
+	} else {
+		w.Header().Set("Content-Type", "application/rss+xml; charset=utf-8")
+	}
+	w.Write(out)
+}
+
+// --- Dryrun (live preview) ---
+
+type dryrunCacheEntry struct {
+	items    []*gofeed.Item
+	raw      []byte
+	feedType string
+	expires  time.Time
+}
+
+var (
+	dryrunCacheMu sync.Mutex
+	dryrunCache   = map[string]dryrunCacheEntry{}
+)
+
+const (
+	dryrunCacheTTL  = 5 * time.Minute
+	dryrunItemLimit = 50
+)
+
+func fetchAndCacheItems(url string) ([]*gofeed.Item, []byte, string, error) {
+	dryrunCacheMu.Lock()
+	if e, ok := dryrunCache[url]; ok && time.Now().Before(e.expires) {
+		items, raw, ft := e.items, e.raw, e.feedType
+		dryrunCacheMu.Unlock()
+		return items, raw, ft, nil
+	}
+	dryrunCacheMu.Unlock()
+
+	resp, err := feedClient.Get(url)
+	if err != nil {
+		return nil, nil, "", err
+	}
+	defer resp.Body.Close()
+	raw, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, nil, "", err
+	}
+	parsed, err := feedParser.ParseString(string(raw))
+	if err != nil {
+		return nil, nil, "", err
+	}
+
+	dryrunCacheMu.Lock()
+	now := time.Now()
+	for k, e := range dryrunCache {
+		if now.After(e.expires) {
+			delete(dryrunCache, k)
+		}
+	}
+	dryrunCache[url] = dryrunCacheEntry{
+		items:    parsed.Items,
+		raw:      raw,
+		feedType: parsed.FeedType,
+		expires:  now.Add(dryrunCacheTTL),
+	}
+	dryrunCacheMu.Unlock()
+	return parsed.Items, raw, parsed.FeedType, nil
+}
+
+type dryrunItem struct {
+	Passed bool   `json:"passed"`
+	XML    string `json:"xml"`
+}
+
+type dryrunResponse struct {
+	Total   int          `json:"total"`
+	PassN   int          `json:"passN"`
+	FilterN int          `json:"filterN"`
+	Items   []dryrunItem `json:"items"`
+	More    int          `json:"more"`
+}
+
+func handleDryrun(w http.ResponseWriter, r *http.Request) {
+	var feed Feed
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxBodySize)).Decode(&feed); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if feed.URL == "" {
+		http.Error(w, "url is required", http.StatusBadRequest)
+		return
+	}
+
+	items, raw, feedType, err := fetchAndCacheItems(feed.URL)
+	if err != nil {
+		http.Error(w, "fetch failed: "+err.Error(), http.StatusBadGateway)
+		return
+	}
+
+	passed := filterItems(items, feed)
+	keep := make(map[*gofeed.Item]bool, len(passed))
+	for _, it := range passed {
+		keep[it] = true
+	}
+
+	doc := etree.NewDocument()
+	if err := doc.ReadFromBytes(raw); err != nil {
+		http.Error(w, "parse failed: "+err.Error(), http.StatusBadGateway)
+		return
+	}
+	itemTag := "item"
+	if feedType == "atom" {
+		itemTag = "entry"
+	}
+	xmlItems := doc.FindElements("//" + itemTag)
+
+	out := dryrunResponse{Total: len(items), Items: []dryrunItem{}}
+	for i, it := range items {
+		passedFlag := keep[it]
+		if passedFlag {
+			out.PassN++
+		} else {
+			out.FilterN++
+		}
+		if len(out.Items) >= dryrunItemLimit || i >= len(xmlItems) {
+			continue
+		}
+		xmlDoc := etree.NewDocument()
+		xmlDoc.SetRoot(xmlItems[i].Copy())
+		xmlDoc.Indent(2)
+		xmlStr, err := xmlDoc.WriteToString()
+		if err != nil {
+			continue
+		}
+		out.Items = append(out.Items, dryrunItem{Passed: passedFlag, XML: strings.TrimRight(xmlStr, "\n")})
+	}
+	out.More = len(items) - len(out.Items)
+	if out.More < 0 {
+		out.More = 0
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(out)
 }
 
 func handlePartialGroup(w http.ResponseWriter, r *http.Request) {
@@ -633,9 +1009,6 @@ func main() {
 	if v := os.Getenv("DATA_FILE"); v != "" {
 		dataFile = v
 	}
-	if v := os.Getenv("PORT"); v != "" {
-		port = v
-	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{$}", handleIndex)
 	mux.HandleFunc("POST /feeds", handleCreate)
@@ -645,8 +1018,13 @@ func main() {
 	mux.HandleFunc("GET /api/feed", handleFeedXML)
 	mux.HandleFunc("GET /feeds/{name}", handleFeedXML)
 	mux.HandleFunc("GET /health", handleHealth)
+	mux.HandleFunc("POST /api/dryrun", handleDryrun)
 	mux.HandleFunc("GET /partials/group", handlePartialGroup)
 	mux.HandleFunc("GET /partials/rule", handlePartialRule)
-	log.Printf("rss-griddle listening on :%s", port)
-	log.Fatal(http.ListenAndServe(":"+port, mux))
+	addr := ":4080"
+	if p := os.Getenv("PORT"); p != "" {
+		addr = ":" + p
+	}
+	log.Println("rss-griddle listening on " + addr)
+	log.Fatal(http.ListenAndServe(addr, mux))
 }

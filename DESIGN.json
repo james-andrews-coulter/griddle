@@ -1,0 +1,246 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-04-30T00:00:00Z",
+  "title": "Design System: rss-griddle",
+  "extensions": {
+    "colorMeta": {
+      "paper-white": {
+        "role": "neutral",
+        "displayName": "Paper White",
+        "canonical": "oklch(100% 0 0)",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(28% 0 0)",
+          "oklch(40% 0 0)",
+          "oklch(53% 0 0)",
+          "oklch(66% 0 0)",
+          "oklch(78% 0 0)",
+          "oklch(89% 0 0)",
+          "oklch(100% 0 0)"
+        ]
+      },
+      "console-black": {
+        "role": "primary",
+        "displayName": "Console Black",
+        "canonical": "oklch(13% 0 0)",
+        "tonalRamp": [
+          "oklch(13% 0 0)",
+          "oklch(25% 0 0)",
+          "oklch(37% 0 0)",
+          "oklch(49% 0 0)",
+          "oklch(62% 0 0)",
+          "oklch(74% 0 0)",
+          "oklch(86% 0 0)",
+          "oklch(95% 0 0)"
+        ]
+      },
+      "hyperlink-cyan": {
+        "role": "secondary",
+        "displayName": "Hyperlink Cyan",
+        "canonical": "oklch(52% 0.118 232)",
+        "tonalRamp": [
+          "oklch(18% 0.06 232)",
+          "oklch(28% 0.08 232)",
+          "oklch(40% 0.10 232)",
+          "oklch(52% 0.118 232)",
+          "oklch(64% 0.10 232)",
+          "oklch(76% 0.07 232)",
+          "oklch(86% 0.04 232)",
+          "oklch(95% 0.02 232)"
+        ]
+      },
+      "status-line-gray": {
+        "role": "neutral",
+        "displayName": "Status-Line Gray",
+        "canonical": "oklch(53% 0.005 250)",
+        "tonalRamp": [
+          "oklch(18% 0.005 250)",
+          "oklch(28% 0.005 250)",
+          "oklch(38% 0.005 250)",
+          "oklch(48% 0.005 250)",
+          "oklch(58% 0.005 250)",
+          "oklch(68% 0.005 250)",
+          "oklch(80% 0.005 250)",
+          "oklch(92% 0.005 250)"
+        ]
+      },
+      "error-magenta": {
+        "role": "tertiary",
+        "displayName": "Error Magenta",
+        "canonical": "oklch(56% 0.232 358)",
+        "tonalRamp": [
+          "oklch(20% 0.10 358)",
+          "oklch(30% 0.14 358)",
+          "oklch(40% 0.18 358)",
+          "oklch(50% 0.21 358)",
+          "oklch(56% 0.232 358)",
+          "oklch(68% 0.18 358)",
+          "oklch(82% 0.10 358)",
+          "oklch(94% 0.04 358)"
+        ]
+      },
+      "code-block-mist": {
+        "role": "neutral",
+        "displayName": "Code-Block Mist",
+        "canonical": "oklch(94% 0.008 230)",
+        "tonalRamp": [
+          "oklch(20% 0.008 230)",
+          "oklch(32% 0.008 230)",
+          "oklch(45% 0.008 230)",
+          "oklch(57% 0.008 230)",
+          "oklch(69% 0.008 230)",
+          "oklch(80% 0.008 230)",
+          "oklch(89% 0.008 230)",
+          "oklch(94% 0.008 230)"
+        ]
+      },
+      "blockquote-gray": {
+        "role": "neutral",
+        "displayName": "Blockquote Gray",
+        "canonical": "oklch(67% 0.013 247)",
+        "tonalRamp": [
+          "oklch(20% 0.013 247)",
+          "oklch(31% 0.013 247)",
+          "oklch(42% 0.013 247)",
+          "oklch(53% 0.013 247)",
+          "oklch(63% 0.013 247)",
+          "oklch(74% 0.013 247)",
+          "oklch(85% 0.013 247)",
+          "oklch(95% 0.013 247)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Page title (h1). Set off by a generated ASCII rule (`====`) drawn underneath via terminal.css's --display-h1-decoration. The rule, not the size, is the visual heaviness."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Reading text and form values. 15px Menlo at line-height 1.4. The default."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Form labels and <legend> text inside fieldsets. Same family and size as body — distinguished by 600 weight only."
+      }
+    },
+    "shadows": [],
+    "motion": [],
+    "breakpoints": [
+      { "name": "page-width", "value": "60em" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The form-submit action — Console Black fill, Paper White text, sharp corners. Hover shifts the fill to Status-Line Gray.",
+      "html": "<button class=\"ds-btn-primary\">Create Feed</button>",
+      "css": ".ds-btn-primary { background: #151515; color: #ffffff; border: 1px solid #ffffff; border-radius: 0; padding: 0.65em 2em; font-family: Menlo, Monaco, 'Lucida Console', 'Liberation Mono', 'DejaVu Sans Mono', 'Bitstream Vera Sans Mono', 'Courier New', serif; font-size: 15px; font-weight: 400; line-height: 1.4em; cursor: pointer; outline: none; } .ds-btn-primary:hover, .ds-btn-primary:focus-visible { background: #727578; color: #ffffff; }"
+    },
+    {
+      "name": "Error Button",
+      "kind": "button",
+      "refersTo": "button-error",
+      "description": "Destructive actions only. Error Magenta fill, used with hx-confirm so the user is asked before it fires.",
+      "html": "<button class=\"ds-btn-error\">Delete</button>",
+      "css": ".ds-btn-error { background: #d20962; color: #ffffff; border: 1px solid #d20962; border-radius: 0; padding: 0.65em 2em; font-family: Menlo, Monaco, 'Lucida Console', 'Liberation Mono', 'DejaVu Sans Mono', 'Bitstream Vera Sans Mono', 'Courier New', serif; font-size: 15px; font-weight: 400; line-height: 1.4em; cursor: pointer; outline: none; } .ds-btn-error:hover, .ds-btn-error:focus-visible { background: #d20962; border-color: #d20962; }"
+    },
+    {
+      "name": "Hyperlink",
+      "kind": "custom",
+      "refersTo": "link",
+      "description": "The signature interaction. Hyperlink Cyan text at rest; on hover the background fills with cyan and the text flips to Paper White — the entire link 'boxes out'.",
+      "html": "<a class=\"ds-link\" href=\"#\">edit (3)</a>",
+      "css": ".ds-link { color: #1077c4; text-decoration: none; cursor: pointer; font-family: Menlo, Monaco, 'Lucida Console', 'Liberation Mono', 'DejaVu Sans Mono', 'Bitstream Vera Sans Mono', 'Courier New', serif; font-size: 15px; line-height: 1.4em; } .ds-link:hover, .ds-link:focus-visible { background: #1077c4; color: #ffffff; }"
+    },
+    {
+      "name": "Text Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Native input with terminal.css solid styling — 1px Console Black border, Paper White fill, sharp corners.",
+      "html": "<input class=\"ds-input\" type=\"text\" placeholder=\"my-feed\">",
+      "css": ".ds-input { background: #ffffff; color: #151515; border: 1px solid #151515; border-radius: 0; padding: 0.5em; font-family: Menlo, Monaco, 'Lucida Console', 'Liberation Mono', 'DejaVu Sans Mono', 'Bitstream Vera Sans Mono', 'Courier New', serif; font-size: 15px; line-height: 1.4em; outline: none; width: 100%; box-sizing: border-box; } .ds-input:focus-visible { outline: 2px solid #1077c4; outline-offset: 0; }"
+    },
+    {
+      "name": "Native Select",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Stock <select>. The platform's dropdown is the spec — never replace with a custom widget.",
+      "html": "<select class=\"ds-select\"><option>contains</option><option>not contains</option><option>equals</option><option>not equals</option></select>",
+      "css": ".ds-select { background: #ffffff; color: #151515; border: 1px solid #151515; border-radius: 0; padding: 0.5em; font-family: Menlo, Monaco, 'Lucida Console', 'Liberation Mono', 'DejaVu Sans Mono', 'Bitstream Vera Sans Mono', 'Courier New', serif; font-size: 15px; line-height: 1.4em; }"
+    },
+    {
+      "name": "Rule Fieldset",
+      "kind": "card",
+      "refersTo": null,
+      "description": "The signature container. A <fieldset> with <legend> — the rule editor uses nested fieldsets (Group > Rule) to express filter logic structure visually. The system has no other 'card' element.",
+      "html": "<fieldset class=\"ds-fieldset-rule\"><legend>Rule</legend><div class=\"ds-form-row\"><label>Field</label><input type=\"text\" placeholder=\"e.g. title, location\"></div><div class=\"ds-form-row\"><label>Value</label><input type=\"text\" placeholder=\"e.g. Remote, Designer\"></div><div class=\"ds-rule-actions\"><a href=\"#\">remove rule</a></div></fieldset>",
+      "css": ".ds-fieldset-rule { border: 1px solid #151515; border-radius: 0; padding: 10px 20px 20px; margin: 10px 0; background: #ffffff; font-family: Menlo, Monaco, 'Lucida Console', 'Liberation Mono', 'DejaVu Sans Mono', 'Bitstream Vera Sans Mono', 'Courier New', serif; font-size: 15px; line-height: 1.4em; color: #151515; } .ds-fieldset-rule legend { padding: 0 6px; font-weight: 600; font-size: 15px; } .ds-fieldset-rule .ds-form-row { margin: 10px 0; display: flex; flex-direction: column; gap: 4px; } .ds-fieldset-rule label { font-weight: 600; } .ds-fieldset-rule input { background: #ffffff; color: #151515; border: 1px solid #151515; border-radius: 0; padding: 0.5em; font-family: inherit; font-size: 15px; outline: none; box-sizing: border-box; width: 100%; } .ds-fieldset-rule .ds-rule-actions { text-align: right; } .ds-fieldset-rule .ds-rule-actions a { color: #1077c4; text-decoration: none; } .ds-fieldset-rule .ds-rule-actions a:hover { background: #1077c4; color: #ffffff; }"
+    },
+    {
+      "name": "ASCII Heading",
+      "kind": "custom",
+      "refersTo": null,
+      "description": "The signature page title. The h1 is followed by a generated 100-character `=` rule, drawn by terminal.css's h1::after when body.terminal is set. This is the visual cue that defines the system.",
+      "html": "<h1 class=\"ds-h1\">RSS Filter</h1>",
+      "css": ".ds-h1 { position: relative; padding: 20px 0; margin: 0 0 20px 0; overflow: hidden; font-weight: 600; font-family: Menlo, Monaco, 'Lucida Console', 'Liberation Mono', 'DejaVu Sans Mono', 'Bitstream Vera Sans Mono', 'Courier New', serif; font-size: 15px; line-height: 1.4em; color: #151515; } .ds-h1::after { content: \"====================================================================================================\"; position: absolute; bottom: 5px; left: 0; display: block; color: #151515; }"
+    },
+    {
+      "name": "Feeds Table Row",
+      "kind": "custom",
+      "refersTo": null,
+      "description": "Native table row with three text-link actions separated by middle dots. No striping, no hover row highlight, no rounded corners — actions stay terse and prose-like.",
+      "html": "<table class=\"ds-feeds\"><tbody><tr><td>jobs-remote</td><td class=\"ds-feeds-actions\"><a href=\"#\">url</a> · <a href=\"#\">edit (4)</a> · <a href=\"#\">delete</a></td></tr><tr><td>hn-frontpage</td><td class=\"ds-feeds-actions\"><a href=\"#\">url</a> · <a href=\"#\">edit (2)</a> · <a href=\"#\">delete</a></td></tr></tbody></table>",
+      "css": ".ds-feeds { width: 100%; border-collapse: collapse; font-family: Menlo, Monaco, 'Lucida Console', 'Liberation Mono', 'DejaVu Sans Mono', 'Bitstream Vera Sans Mono', 'Courier New', serif; font-size: 15px; line-height: 1.4em; color: #151515; } .ds-feeds td { padding: 6px 4px; border-bottom: 1px solid #727578; } .ds-feeds-actions { text-align: right; } .ds-feeds-actions a { color: #1077c4; text-decoration: none; } .ds-feeds-actions a:hover { background: #1077c4; color: #ffffff; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Home Server Panel",
+    "overview": "rss-griddle's visual system is the bare-metal admin UI from the era before CSS frameworks — when web tools for sysadmins looked like the man pages they came from. White background, monospace from edge to edge, a single accent color reserved for the things you can click, and dark fills only where the user has to commit (a button press, a delete confirmation). Decoration is structural: borders draw the field of work, the heading carries an ASCII rule, the rule editor is literally a <fieldset> with a <legend>. Density follows function. There is no hero, no sidebar, no card. There is a heading, a form, a list, a footer.",
+    "keyCharacteristics": [
+      "Monospace-only typography. One font stack everywhere.",
+      "Sharp corners. border-radius: 0 is doctrine.",
+      "Flat. No shadows. No elevation. Depth via borders and ASCII rules.",
+      "Single-column, 60em max width. No sidebars, no hero blocks.",
+      "One accent color (Hyperlink Cyan), used only for things you can click.",
+      "Mobile-first. Desktop is a wider phone, not a different layout.",
+      "Native HTML form controls; the platform's keyboard and a11y behavior is the spec."
+    ],
+    "rules": [
+      { "name": "The One Accent Rule", "body": "Hyperlink Cyan is for things the user can click. Console Black is for things the user reads. Error Magenta is for things the user shouldn't click without thinking. Use no other color, ever, until a feature requires one — and even then, justify it against this rule first.", "section": "colors" },
+      { "name": "The Inverse Hover Rule", "body": "Links and dark-fill buttons flip on hover — text becomes background, background becomes text. This is the entire interaction language. Don't add underlines, don't shift opacity, don't introduce a third state.", "section": "colors" },
+      { "name": "The No-Tint Rule", "body": "Backgrounds are #ffffff and #151515. Do not introduce off-whites, off-blacks, or warm/cool tints to 'soften' the system. The contrast is the point.", "section": "colors" },
+      { "name": "The One Font Rule", "body": "There is one font stack. Adding a second font — sans for body, serif for display, anything — is forbidden. The aesthetic depends on the absence of typographic variety.", "section": "typography" },
+      { "name": "The ASCII Underline Rule", "body": "The h1's ==== rule is drawn by body.terminal { --display-h1-decoration: block }. Keep <body class=\"terminal\"> on the document. Removing it strips the signature element of the page.", "section": "typography" },
+      { "name": "The Weight-Not-Size Rule", "body": "Hierarchy comes from weight (400 vs 600). Do not introduce a typographic scale. If something needs more emphasis, it gets a heading or a fieldset, not bigger type.", "section": "typography" },
+      { "name": "The Flat Rule", "body": "No shadows. Ever. Not on hover, not on focus, not on dropdowns or modals. If a component needs to feel separated from its surroundings, it gets a 1px solid border in Console Black or Status-Line Gray.", "section": "elevation" },
+      { "name": "The No-Radius Rule", "body": "Sharp corners are doctrine. border-radius: 0 is the default and the only valid value. Pill buttons, rounded cards, and softened inputs are all forbidden — they read as 'modern template' and undo the terminal-native rhythm.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do keep <body class=\"terminal\"> on the document — it enables the h1 ASCII underline that defines the page.",
+      "Do use a single monospace stack everywhere (Menlo + fallbacks). Headings, body, labels, code: all the same family.",
+      "Do use Hyperlink Cyan only on interactive elements. If it appears on screen, the user can click it.",
+      "Do keep border-radius: 0 and 1px solid borders as the elevation language.",
+      "Do prefer native HTML controls. <select>, <input>, <button>, <fieldset>, <legend>, <table> — the platform already shipped this design system.",
+      "Do use <fieldset> + <legend> to express structure (the rule editor's nested groups are the canonical example).",
+      "Do keep the page single-column. Mobile-first; desktop holds at the 60em page-width.",
+      "Do honor prefers-reduced-motion. The static baseline already does."
+    ],
+    "donts": [
+      "Don't add a second font family. A serif display, sans body, or 'friendly' rounded font breaks the One Font Rule.",
+      "Don't introduce shadows, glows, or backdrop blurs. The system is flat by doctrine.",
+      "Don't soften corners. border-radius greater than 0 is forbidden.",
+      "Don't use Hyperlink Cyan for emphasis, decoration, or non-clickable accents — it is reserved for actions.",
+      "Don't use Error Magenta for emphasis or 'look at this' highlights — it means 'you're about to break something'.",
+      "Don't stripe table rows, gradient backgrounds, or tint cards. Backgrounds are Paper White or Console Black.",
+      "Don't ship Dribbble-flavored landing pages, pastel illustrations, mascots, or 'Built for the future of feeds' hero copy.",
+      "Don't ship the consumer SaaS aesthetic — generic Tailwind kits, hero metrics, testimonial rows, three-up feature grids, friendly stock photography.",
+      "Don't ship the 'modern template' look — purple-to-blue gradients on white, oversized rounded CTAs, glassmorphism, animated mesh backgrounds, gradient-text headlines.",
+      "Don't confuse 'terminal-native' with 'retro' — no CRT scanlines, no pixel fonts, no vaporwave palettes, no ASCII-art borders. The aesthetic is workaday Unix on a current machine.",
+      "Don't replace native form controls with custom dropdowns or comboboxes unless you re-implement the full keyboard and screen-reader contract. The platform already did the work.",
+      "Don't add cards. The page has sections separated by margin and fieldsets that group inputs. There are no cards."
+    ]
+  }
+}

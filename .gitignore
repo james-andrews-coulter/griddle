@@ -3,7 +3,7 @@ rss-griddle
 
 # Data
 /data/
-*.json
+feeds.json
 
 # OS
 .DS_Store
